@@ -32,7 +32,13 @@ mod tests {
     #[test]
     fn should_let_actions_through_when_open() {
         let mut cb = create_circuit_breaker();
-        cb.guard::<String, ActionError>(Box::new(|| Ok("hello".to_string())));
+
+        //Results must be used. It is almost always a logic error when you don't.
+        let result = cb.guard::<String, ActionError>(Box::new(|| Ok("hello".to_string())));
+
+        //panics in tests are by default considered failures.
+        let result = result.unwrap();
+        assert_eq!(result, "hello".to_string());
     }
 
     #[test]
