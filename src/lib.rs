@@ -1,4 +1,10 @@
-extern crate core;
+// I have no idea why you had `extern crate core;` here.
+
+// `pub use` reexports items so that users of your library can access them.
+// you can also acheive this by adding `pub` to the module, but in this case it would make the api
+// more complex than it needs to be.
+pub use crate::circuit_breaker::*;
+pub use crate::circuit_breaker_error::*;
 
 mod circuit_breaker;
 mod circuit_breaker_error;
