@@ -15,29 +15,29 @@ use crate::circuit_breaker::CircuitBreakerState::{CLOSED, HALF_OPEN, OPEN};
 use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
 
 pub struct CircuitBreaker<'cb> {
-  failure_threshold: &'cb i8,
-  half_open_attempts: &'cb i8,
-  timeout: Duration,
-  error_counter: AtomicI8,
-  state: Arc<Mutex<CircuitBreakerState>>,
+    failure_threshold: &'cb i8,
+    half_open_attempts: &'cb i8,
+    timeout: Duration,
+    error_counter: AtomicI8,
+    state: Arc<Mutex<CircuitBreakerState>>,
 }
 
 impl<'cb> CircuitBreaker<'cb> {
-  pub fn new(failure_threshold: &'cb i8, half_open_attempts: &'cb i8, timeout: Duration) -> Self {
-    CircuitBreaker {
-      failure_threshold,
-      half_open_attempts,
-      timeout,
-      error_counter: AtomicI8::new(0),
-      state: Arc::new(Mutex::new(CLOSED)),
+    pub fn new(failure_threshold: &'cb i8, half_open_attempts: &'cb i8, timeout: Duration) -> Self {
+        CircuitBreaker {
+            failure_threshold,
+            half_open_attempts,
+            timeout,
+            error_counter: AtomicI8::new(0),
+            state: Arc::new(Mutex::new(CLOSED)),
+        }
     }
-  }
 
-  pub fn guard<T, E: Error>(&mut self, action: Action<T, E>) -> CircuitBreakerResult<T> {
-    let state = *Arc::clone(&self.state).lock().unwrap().deref();
-    let state_clone = state.clone();
-    mem::drop(state);
-    match state_clone{
+    pub fn guard<T, E: Error>(&mut self, action: Action<T, E>) -> CircuitBreakerResult<T> {
+        let state = *Arc::clone(&self.state).lock().unwrap().deref();
+        let state_clone = state.clone();
+        mem::drop(state);
+        match state_clone{
       CLOSED => {
         self.attemptAction(self.failure_threshold, action)
       },
@@ -66,50 +66,50 @@ impl<'cb> CircuitBreaker<'cb> {
         }
       }
     }
-  }
+    }
 
-  fn attemptAction<T, E: Error>(
-    &mut self,
-    threshold: &'cb i8,
-    action: Action<T, E>,
-  ) -> CircuitBreakerResult<T> {
-    return if &self.error_counter.load(Ordering::Relaxed) < threshold {
-      match action() {
-        Ok(t) => CircuitBreakerResult::Ok(t),
-        Err(e) => {
-          self.error_counter.fetch_add(1, Ordering::Relaxed);
-          CircuitBreakerResult::Err(CircuitBreakerError {
-            error_type: CircuitBreakerErrorType::ErrorWrapper,
-            message: format!("Action failed {}", e),
-          })
-        }
-      }
-    } else {
-      self.open_circuit();
-      Result::Err(CircuitBreakerError{
+    fn attemptAction<T, E: Error>(
+        &mut self,
+        threshold: &'cb i8,
+        action: Action<T, E>,
+    ) -> CircuitBreakerResult<T> {
+        return if &self.error_counter.load(Ordering::Relaxed) < threshold {
+            match action() {
+                Ok(t) => CircuitBreakerResult::Ok(t),
+                Err(e) => {
+                    self.error_counter.fetch_add(1, Ordering::Relaxed);
+                    CircuitBreakerResult::Err(CircuitBreakerError {
+                        error_type: CircuitBreakerErrorType::ErrorWrapper,
+                        message: format!("Action failed {}", e),
+                    })
+                }
+            }
+        } else {
+            self.open_circuit();
+            Result::Err(CircuitBreakerError{
         error_type: CircuitBreakerErrorType::Open,
         message : format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", self.failure_threshold),
       })
-    };
-  }
+        };
+    }
 
-  fn open_circuit(&mut self) {
-    let mut state = self.state.lock().unwrap();
-    mem::replace(&mut *state, OPEN);
-    self.error_counter.store(0, Ordering::Relaxed);
+    fn open_circuit(&mut self) {
+        let mut state = self.state.lock().unwrap();
+        mem::replace(&mut *state, OPEN);
+        self.error_counter.store(0, Ordering::Relaxed);
 
-    let state = Arc::clone(&self.state);
-    let timeout = self.timeout;
-    thread::spawn(move || {
-      thread::sleep(timeout);
-      mem::replace(&mut *state.lock().unwrap(), HALF_OPEN);
-    });
-  }
+        let state = Arc::clone(&self.state);
+        let timeout = self.timeout;
+        thread::spawn(move || {
+            thread::sleep(timeout);
+            mem::replace(&mut *state.lock().unwrap(), HALF_OPEN);
+        });
+    }
 }
 
 #[derive(Copy, Clone)]
 enum CircuitBreakerState {
-  CLOSED,
-  OPEN,
-  HALF_OPEN,
+    CLOSED,
+    OPEN,
+    HALF_OPEN,
 }
