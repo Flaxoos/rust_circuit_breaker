@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{mem, thread};
 
-type Action<T, E: Error> = Box<dyn Fn() -> Result<T, E>>;
+//Trait bounds on the left side of this aren't enforced so the `E: Error` wasn't doing anything
+type Action<T, E> = Box<dyn Fn() -> Result<T, E>>;
 type CircuitBreakerResult<T> = Result<T, CircuitBreakerError>;
 
 use crate::circuit_breaker::CircuitBreakerState::{Closed, HalfOpen, Open};
@@ -49,7 +50,10 @@ impl<'cb> CircuitBreaker<'cb> {
         match self.attempt_action(self.half_open_attempts, action){
           Ok(action_result) => {
             let state = Arc::clone(&self.state);
-            mem::replace(&mut *state.lock().unwrap(), Closed);
+            //you don't need to use mem::replace here.
+            //Its much easier to deref the mutex guard to assign to it.
+            //Cargo's warning tells you this much.
+            *state.lock().unwrap() = Closed;
             Ok(action_result)
           }
           Err(e) => {
@@ -96,14 +100,15 @@ impl<'cb> CircuitBreaker<'cb> {
 
     fn open_circuit(&mut self) {
         let mut state = self.state.lock().unwrap();
-        mem::replace(&mut *state, Open);
+        //again you don't need to use mem::replace here.
+        *state = Open;
         self.error_counter.store(0, Ordering::Relaxed);
 
         let state = Arc::clone(&self.state);
         let timeout = self.timeout;
         thread::spawn(move || {
             thread::sleep(timeout);
-            mem::replace(&mut *state.lock().unwrap(), HalfOpen);
+            *state.lock().unwrap() = HalfOpen;
         });
     }
 }
