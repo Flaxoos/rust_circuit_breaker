@@ -6,7 +6,9 @@ pub struct CircuitBreakerError {
     pub error_type: CircuitBreakerErrorType,
 }
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
+// This was setup to only derive PartialEq and Debug in test, but you were using it for normal code in circuit_breakers::CircuitBreaker::guard
+// I've adjusted to always derive those features.
+#[derive(PartialEq, Debug)]
 pub enum CircuitBreakerErrorType {
     ErrorWrapper,
     Open,
