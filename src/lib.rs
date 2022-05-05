@@ -5,16 +5,14 @@ mod circuit_breaker_error;
 
 #[cfg(test)]
 mod tests {
+    //cleaned up unused imports -- intellij rust's autocomplete is helpful and inserts them automatically.
     use std::error::Error;
-    use std::ffi::NulError;
-    use std::fmt::{format, write, Debug, Display, Formatter, Pointer};
-    use std::io::ErrorKind;
-    use std::thread::Thread;
+    use std::fmt::{Debug, Display, Formatter};
     use std::time::Duration;
-    use std::{io, thread};
+    use std::thread;
 
     use crate::circuit_breaker::CircuitBreaker;
-    use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
+    use crate::circuit_breaker_error::CircuitBreakerErrorType;
 
     const failureThreshold: &'static i8 = &3;
     const halfOpenAttempts: &'static i8 = &2;

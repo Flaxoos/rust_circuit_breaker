@@ -1,11 +1,10 @@
 // You had a (unused) import for std::os::macos::raw::stat. Most things in std::os are platform specific.
 // This looked like something autocomplete inserted automatically
-use std::borrow::{Borrow, BorrowMut};
+// I've also removed a bunch of unused imports
 use std::error::Error;
-use std::fmt::{format, Display};
-use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicI8, AtomicUsize, Ordering};
-use std::sync::{Arc, LockResult, Mutex};
+use std::ops::Deref;
+use std::sync::atomic::{AtomicI8, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{mem, thread};
 
