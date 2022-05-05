@@ -11,7 +11,7 @@ use std::{mem, thread};
 type Action<T, E: Error> = Box<dyn Fn() -> Result<T, E>>;
 type CircuitBreakerResult<T> = Result<T, CircuitBreakerError>;
 
-use crate::circuit_breaker::CircuitBreakerState::{CLOSED, HALF_OPEN, OPEN};
+use crate::circuit_breaker::CircuitBreakerState::{Closed, HalfOpen, Open};
 use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
 
 pub struct CircuitBreaker<'cb> {
@@ -29,7 +29,7 @@ impl<'cb> CircuitBreaker<'cb> {
             half_open_attempts,
             timeout,
             error_counter: AtomicI8::new(0),
-            state: Arc::new(Mutex::new(CLOSED)),
+            state: Arc::new(Mutex::new(Closed)),
         }
     }
 
@@ -38,18 +38,18 @@ impl<'cb> CircuitBreaker<'cb> {
         let state_clone = state.clone();
         mem::drop(state);
         match state_clone{
-      CLOSED => {
-        self.attemptAction(self.failure_threshold, action)
+      Closed => {
+        self.attempt_action(self.failure_threshold, action)
       },
-      OPEN => Err(CircuitBreakerError{
+      Open => Err(CircuitBreakerError{
         error_type: CircuitBreakerErrorType::Open,
         message : format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", self.failure_threshold),
       }),
-      HALF_OPEN => {
-        match self.attemptAction(self.half_open_attempts, action){
+      HalfOpen => {
+        match self.attempt_action(self.half_open_attempts, action){
           Ok(action_result) => {
             let state = Arc::clone(&self.state);
-            mem::replace(&mut *state.lock().unwrap(), CLOSED);
+            mem::replace(&mut *state.lock().unwrap(), Closed);
             Ok(action_result)
           }
           Err(e) => {
@@ -68,7 +68,8 @@ impl<'cb> CircuitBreaker<'cb> {
     }
     }
 
-    fn attemptAction<T, E: Error>(
+    //Rust's methods are formated as lowercase_text_with_underscores
+    fn attempt_action<T, E: Error>(
         &mut self,
         threshold: &'cb i8,
         action: Action<T, E>,
@@ -95,21 +96,22 @@ impl<'cb> CircuitBreaker<'cb> {
 
     fn open_circuit(&mut self) {
         let mut state = self.state.lock().unwrap();
-        mem::replace(&mut *state, OPEN);
+        mem::replace(&mut *state, Open);
         self.error_counter.store(0, Ordering::Relaxed);
 
         let state = Arc::clone(&self.state);
         let timeout = self.timeout;
         thread::spawn(move || {
             thread::sleep(timeout);
-            mem::replace(&mut *state.lock().unwrap(), HALF_OPEN);
+            mem::replace(&mut *state.lock().unwrap(), HalfOpen);
         });
     }
 }
 
 #[derive(Copy, Clone)]
 enum CircuitBreakerState {
-    CLOSED,
-    OPEN,
-    HALF_OPEN,
+    //Enum variants are formatted in CamelCase.
+    Closed,
+    Open,
+    HalfOpen,
 }

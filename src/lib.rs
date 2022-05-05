@@ -20,12 +20,13 @@ mod tests {
     use crate::circuit_breaker::CircuitBreaker;
     use crate::circuit_breaker_error::CircuitBreakerErrorType;
 
-    const failureThreshold: &'static i8 = &3;
-    const halfOpenAttempts: &'static i8 = &2;
-    const timeout: Duration = Duration::new(1, 0);
+    //Rust's constants are in UPPER_CASE_WITH_UNDERSCORES
+    const FAILURE_THRESHOLD: &'static i8 = &3;
+    const HALF_OPEN_ATTEMPTS: &'static i8 = &2;
+    const TIMEOUT: Duration = Duration::new(1, 0);
 
     fn create_circuit_breaker() -> CircuitBreaker<'static> {
-        return CircuitBreaker::new(&failureThreshold, &halfOpenAttempts, timeout);
+        return CircuitBreaker::new(&FAILURE_THRESHOLD, &HALF_OPEN_ATTEMPTS, TIMEOUT);
     }
 
     #[test]
@@ -37,7 +38,7 @@ mod tests {
     #[test]
     fn should_switch_to_open_after_failure_threshold() {
         let mut cb = create_circuit_breaker();
-        for _ in 0..*failureThreshold {
+        for _ in 0..*FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
             let want = CircuitBreakerErrorType::ErrorWrapper;
@@ -63,7 +64,7 @@ mod tests {
     #[test]
     fn should_switch_to_half_open_after_failure_threshold_exceeded_and_timeout_period_passed() {
         let mut cb = create_circuit_breaker();
-        for _ in 0..*failureThreshold {
+        for _ in 0..*FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
             let want = CircuitBreakerErrorType::ErrorWrapper;
@@ -78,7 +79,7 @@ mod tests {
         let got = result.unwrap_err().error_type;
         assert_eq!(got, want);
 
-        thread::sleep(timeout.mul_f32(1.1));
+        thread::sleep(TIMEOUT.mul_f32(1.1));
 
         // should switch to half open
         let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
@@ -92,7 +93,7 @@ mod tests {
     fn should_switch_to_open_after_failure_threshold_exceeded_and_timeout_period_passed_and_half_open_attempts_exceeded(
     ) {
         let mut cb = create_circuit_breaker();
-        for _ in 0..*failureThreshold {
+        for _ in 0..*FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
             let want = CircuitBreakerErrorType::ErrorWrapper;
@@ -107,10 +108,10 @@ mod tests {
         let got = result.unwrap_err().error_type;
         assert_eq!(got, want);
 
-        thread::sleep(timeout.mul_f32(1.1));
+        thread::sleep(TIMEOUT.mul_f32(1.1));
 
         // should switch to half open
-        for _ in 0..*halfOpenAttempts {
+        for _ in 0..*HALF_OPEN_ATTEMPTS {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
             let want = CircuitBreakerErrorType::HalfOpen;
@@ -130,7 +131,7 @@ mod tests {
     fn should_switch_to_closed_after_failure_threshold_exceeded_and_timeout_period_passed_and_action_works_again(
     ) {
         let mut cb = create_circuit_breaker();
-        for _ in 0..*failureThreshold {
+        for _ in 0..*FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
             let want = CircuitBreakerErrorType::ErrorWrapper;
@@ -145,7 +146,7 @@ mod tests {
         let got = result.unwrap_err().error_type;
         assert_eq!(got, want);
 
-        thread::sleep(timeout.mul_f32(1.1));
+        thread::sleep(TIMEOUT.mul_f32(1.1));
 
         // should switch to closed
         let result = cb.guard::<String, ActionError>(Box::new(|| Ok("hello".to_string())));
