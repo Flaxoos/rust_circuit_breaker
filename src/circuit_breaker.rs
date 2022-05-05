@@ -15,16 +15,25 @@ type CircuitBreakerResult<T> = Result<T, CircuitBreakerError>;
 use crate::circuit_breaker::CircuitBreakerState::{Closed, HalfOpen, Open};
 use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
 
-pub struct CircuitBreaker<'cb> {
-    failure_threshold: &'cb i8,
-    half_open_attempts: &'cb i8,
+// Ok, first issue that cargo didn't warn about.
+// `failure_threshold` and `half_open_attempts` don't need to be references.
+// References in structs generally make things more complicated. Its better to avoid them.
+// The three reasons I'd use a immutable reference in a struct are:
+// * The type of the field is not clonable
+// * The type is too expensive to clone
+// * The type uses interior mutabilty (such as as Mutex or Cell), and I need to change the original value.
+// In this case the reference takes up 8x more memory on x64 machines than just copying the value.
+// Also, by avoiding having a lifetime on the CircuitBreaker, it makes the struct easier to use.
+pub struct CircuitBreaker {
+    failure_threshold: i8,
+    half_open_attempts: i8,
     timeout: Duration,
     error_counter: AtomicI8,
     state: Arc<Mutex<CircuitBreakerState>>,
 }
 
-impl<'cb> CircuitBreaker<'cb> {
-    pub fn new(failure_threshold: &'cb i8, half_open_attempts: &'cb i8, timeout: Duration) -> Self {
+impl CircuitBreaker {
+    pub fn new(failure_threshold: i8, half_open_attempts: i8, timeout: Duration) -> Self {
         CircuitBreaker {
             failure_threshold,
             half_open_attempts,
@@ -73,12 +82,14 @@ impl<'cb> CircuitBreaker<'cb> {
     }
 
     //Rust's methods are formated as lowercase_text_with_underscores
+    //
+    // threshold didn't need to be a reference since `i8` is trivially copyable
     fn attempt_action<T, E: Error>(
         &mut self,
-        threshold: &'cb i8,
+        threshold: i8,
         action: Action<T, E>,
     ) -> CircuitBreakerResult<T> {
-        return if &self.error_counter.load(Ordering::Relaxed) < threshold {
+        return if self.error_counter.load(Ordering::Relaxed) < threshold {
             match action() {
                 Ok(t) => CircuitBreakerResult::Ok(t),
                 Err(e) => {
