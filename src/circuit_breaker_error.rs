@@ -6,6 +6,12 @@ pub struct CircuitBreakerError {
   pub error_type: CircuitBreakerErrorType,
 }
 
+impl CircuitBreakerError {
+  fn format_message(&self) -> String {
+    format!("{}, {}", self.error_type, self.message)
+  }
+}
+
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum CircuitBreakerErrorType {
   ErrorWrapper,
@@ -13,16 +19,8 @@ pub enum CircuitBreakerErrorType {
   HalfOpen,
 }
 
-impl Debug for CircuitBreakerError {
+impl Display for CircuitBreakerErrorType {
   fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-    write!(f, "{}", self.message)
+    write!(f, "{}", self)
   }
 }
-
-impl Display for CircuitBreakerError {
-  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-    write!(f, "{}", self.message)
-  }
-}
-
-impl Error for CircuitBreakerError {}
