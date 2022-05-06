@@ -52,31 +52,33 @@ impl CircuitBreaker {
         let state_clone = state.clone();
         mem::drop(state);
         match state_clone {
-      Closed => {
-        self.attempt_action(self.failure_threshold, action)
-      },
-      Open => Err(CircuitBreakerError::Open { threshold: self.failure_threshold }),
-      HalfOpen => {
-        match self.attempt_action(self.half_open_attempts, action){
-          Ok(action_result) => {
-            let state = Arc::clone(&self.state);
-            //you don't need to use mem::replace here.
-            //Its much easier to deref the mutex guard to assign to it.
-            //Cargo's warning tells you this much.
-            *state.lock().unwrap() = Closed;
-            Ok(action_result)
-          }
-          Err(e) => {
-            let error = if let CircuitBreakerError::Wrapped(_) = e {
-              CircuitBreakerError::HalfOpen { threshold: self.failure_threshold }
-            } else {
-              e
-            };
-            Err(error)
-          }
+            Closed => self.attempt_action(self.failure_threshold, action),
+            Open => Err(CircuitBreakerError::Open {
+                threshold: self.failure_threshold,
+            }),
+            HalfOpen => {
+                match self.attempt_action(self.half_open_attempts, action) {
+                    Ok(action_result) => {
+                        let state = Arc::clone(&self.state);
+                        //you don't need to use mem::replace here.
+                        //Its much easier to deref the mutex guard to assign to it.
+                        //Cargo's warning tells you this much.
+                        *state.lock().unwrap() = Closed;
+                        Ok(action_result)
+                    }
+                    Err(e) => {
+                        let error = if let CircuitBreakerError::Wrapped(_) = e {
+                            CircuitBreakerError::HalfOpen {
+                                threshold: self.failure_threshold,
+                            }
+                        } else {
+                            e
+                        };
+                        Err(error)
+                    }
+                }
+            }
         }
-      }
-    }
     }
 
     //Rust's methods are formated as lowercase_text_with_underscores

@@ -14,20 +14,18 @@ pub enum CircuitBreakerError<E> {
     // For the ErrorWrapper type I removed the 'Error' prefix. It doesn't add any new context.
     // Also, it now stores the wrapped error instead of just a formatted method.
     Wrapped(E),
-    Open {
-        threshold: i8,
-    },
-    HalfOpen {
-        threshold: i8,
-    },
+    Open { threshold: i8 },
+    HalfOpen { threshold: i8 },
 }
 
 // Unfortinately I made a compromise when including the inner error in E,
 // we can either print a generic message for the wrapped error, or we can only print our errors nicely when the inner error
 // can also be printed.
 // Since `CircuitBreaker::guard` enforces the `Error` trait on the returned value, the latter made more sense
-impl<E> Display for CircuitBreakerError<E> 
-where E: Display {
+impl<E> Display for CircuitBreakerError<E>
+where
+    E: Display,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             CircuitBreakerError::Wrapped(e) => write!(f, "Action failed {}", e),
@@ -38,7 +36,9 @@ where E: Display {
 }
 
 impl<E> Error for CircuitBreakerError<E>
-where E: Error {
+where
+    E: Error,
+{
     // if we are wrapped an error, we should override the default implentation of cause
     // to provide that wrapped error
     fn cause(&self) -> Option<&dyn Error> {

@@ -14,11 +14,11 @@ mod tests {
     //cleaned up unused imports -- intellij rust's autocomplete is helpful and inserts them automatically.
     use std::error::Error;
     use std::fmt::{Debug, Display, Formatter};
-    use std::time::Duration;
     use std::thread;
+    use std::time::Duration;
 
-    use crate::CircuitBreakerError;
     use crate::circuit_breaker::CircuitBreaker;
+    use crate::CircuitBreakerError;
 
     //Rust's constants are in UPPER_CASE_WITH_UNDERSCORES
     const FAILURE_THRESHOLD: i8 = 3;
@@ -55,14 +55,18 @@ mod tests {
         // should switch to open
         let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
         assert!(result.is_err());
-        let want = CircuitBreakerError::Open { threshold: FAILURE_THRESHOLD};
+        let want = CircuitBreakerError::Open {
+            threshold: FAILURE_THRESHOLD,
+        };
         let got = result.unwrap_err();
         assert_eq!(got, want);
 
         // should stay open
         let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
         assert!(result.is_err());
-        let want = CircuitBreakerError::Open { threshold: FAILURE_THRESHOLD};
+        let want = CircuitBreakerError::Open {
+            threshold: FAILURE_THRESHOLD,
+        };
         let got = result.unwrap_err();
         assert_eq!(got, want)
     }
@@ -81,7 +85,9 @@ mod tests {
         // should switch to open
         let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
         assert!(result.is_err());
-        let want = CircuitBreakerError::Open { threshold: FAILURE_THRESHOLD};
+        let want = CircuitBreakerError::Open {
+            threshold: FAILURE_THRESHOLD,
+        };
         let got = result.unwrap_err();
         assert_eq!(got, want);
 
@@ -94,7 +100,10 @@ mod tests {
         // I don't know what the expected threshold should be in the half open state, so I'm using match to assert the error
         match result.unwrap_err() {
             CircuitBreakerError::HalfOpen { threshold: _ } => (), //Expected
-            e => panic!("Wanted a `CircuitBreakerError::HalfOpen {{ .. }} got a {}", e),
+            e => panic!(
+                "Wanted a `CircuitBreakerError::HalfOpen {{ .. }} got a {}",
+                e
+            ),
         };
         // let want = CircuitBreakerError::HalfOpen { error_count: HALF_OPEN_ATTEMPTS };
         // let got = result.unwrap_err();
@@ -116,7 +125,9 @@ mod tests {
         // should switch to open
         let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
         assert!(result.is_err());
-        let want = CircuitBreakerError::Open { threshold: FAILURE_THRESHOLD};
+        let want = CircuitBreakerError::Open {
+            threshold: FAILURE_THRESHOLD,
+        };
         let got = result.unwrap_err();
         assert_eq!(got, want);
 
@@ -129,7 +140,10 @@ mod tests {
             // I don't know what the expected threshold should be in the half open state, so I'm using match to assert the error
             match result.unwrap_err() {
                 CircuitBreakerError::HalfOpen { threshold: _ } => (), //Expected
-                e => panic!("Wanted a `CircuitBreakerError::HalfOpen {{ .. }} got a {}", e),
+                e => panic!(
+                    "Wanted a `CircuitBreakerError::HalfOpen {{ .. }} got a {}",
+                    e
+                ),
             };
             // let want = CircuitBreakerError::HalfOpen { error_count: HALF_OPEN_ATTEMPTS };
             // let got = result.unwrap_err();
@@ -164,7 +178,9 @@ mod tests {
         // should switch to open
         let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
         assert!(result.is_err());
-        let want = CircuitBreakerError::Open { threshold: FAILURE_THRESHOLD};
+        let want = CircuitBreakerError::Open {
+            threshold: FAILURE_THRESHOLD,
+        };
         let got = result.unwrap_err();
         assert_eq!(got, want);
 
