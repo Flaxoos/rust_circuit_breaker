@@ -10,10 +10,10 @@ use std::{mem, thread};
 
 //Trait bounds on the left side of this aren't enforced so the `E: Error` wasn't doing anything
 type Action<T, E> = Box<dyn Fn() -> Result<T, E>>;
-type CircuitBreakerResult<T> = Result<T, CircuitBreakerError>;
+type CircuitBreakerResult<T, E> = Result<T, CircuitBreakerError<E>>;
 
 use crate::circuit_breaker::CircuitBreakerState::{Closed, HalfOpen, Open};
-use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
+use crate::circuit_breaker_error::CircuitBreakerError;
 
 // Ok, first issue that cargo didn't warn about.
 // `failure_threshold` and `half_open_attempts` don't need to be references.
@@ -43,18 +43,15 @@ impl CircuitBreaker {
         }
     }
 
-    pub fn guard<T, E: Error>(&mut self, action: Action<T, E>) -> CircuitBreakerResult<T> {
+    pub fn guard<T, E: Error>(&mut self, action: Action<T, E>) -> CircuitBreakerResult<T, E> {
         let state = *Arc::clone(&self.state).lock().unwrap().deref();
         let state_clone = state.clone();
         mem::drop(state);
-        match state_clone{
+        match state_clone {
       Closed => {
         self.attempt_action(self.failure_threshold, action)
       },
-      Open => Err(CircuitBreakerError{
-        error_type: CircuitBreakerErrorType::Open,
-        message : format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", self.failure_threshold),
-      }),
+      Open => Err(CircuitBreakerError::Open { threshold: self.failure_threshold }),
       HalfOpen => {
         match self.attempt_action(self.half_open_attempts, action){
           Ok(action_result) => {
@@ -66,12 +63,9 @@ impl CircuitBreaker {
             Ok(action_result)
           }
           Err(e) => {
-            let error = if e.error_type == CircuitBreakerErrorType::ErrorWrapper {
-              CircuitBreakerError {
-                error_type: CircuitBreakerErrorType::HalfOpen,
-                message: format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", self.failure_threshold),
-              }
-            }else {
+            let error = if let CircuitBreakerError::Wrapped(_) = e {
+              CircuitBreakerError::HalfOpen { threshold: self.failure_threshold }
+            } else {
               e
             };
             Err(error)
@@ -88,24 +82,18 @@ impl CircuitBreaker {
         &mut self,
         threshold: i8,
         action: Action<T, E>,
-    ) -> CircuitBreakerResult<T> {
+    ) -> CircuitBreakerResult<T, E> {
         return if self.error_counter.load(Ordering::Relaxed) < threshold {
             match action() {
                 Ok(t) => CircuitBreakerResult::Ok(t),
                 Err(e) => {
                     self.error_counter.fetch_add(1, Ordering::Relaxed);
-                    CircuitBreakerResult::Err(CircuitBreakerError {
-                        error_type: CircuitBreakerErrorType::ErrorWrapper,
-                        message: format!("Action failed {}", e),
-                    })
+                    CircuitBreakerResult::Err(CircuitBreakerError::Wrapped(e))
                 }
             }
         } else {
             self.open_circuit();
-            Result::Err(CircuitBreakerError{
-        error_type: CircuitBreakerErrorType::Open,
-        message : format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", self.failure_threshold),
-      })
+            Result::Err(CircuitBreakerError::Open { threshold })
         };
     }
 
