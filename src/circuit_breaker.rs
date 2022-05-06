@@ -43,7 +43,11 @@ impl CircuitBreaker {
         }
     }
 
-    pub fn guard<T, E: Error>(&mut self, action: Action<T, E>) -> CircuitBreakerResult<T, E> {
+    //`guard` nor `attempt_action` nor `open_circuit` needed to be mut.
+    // Since you've gone through the effort to use atomics/Arc/Mutexes I figured removing the mut requirement was appropriate.
+    // An alternative would be to cache a `SystemTime` inside `CircuitBreakerState::Open` and compare the current time to that to determine
+    // when to go to the HalfOpen state
+    pub fn guard<T, E: Error>(&self, action: Action<T, E>) -> CircuitBreakerResult<T, E> {
         let state = *Arc::clone(&self.state).lock().unwrap().deref();
         let state_clone = state.clone();
         mem::drop(state);
@@ -79,7 +83,7 @@ impl CircuitBreaker {
     //
     // threshold didn't need to be a reference since `i8` is trivially copyable
     fn attempt_action<T, E: Error>(
-        &mut self,
+        &self,
         threshold: i8,
         action: Action<T, E>,
     ) -> CircuitBreakerResult<T, E> {
@@ -97,7 +101,7 @@ impl CircuitBreaker {
         };
     }
 
-    fn open_circuit(&mut self) {
+    fn open_circuit(&self) {
         let mut state = self.state.lock().unwrap();
         //again you don't need to use mem::replace here.
         *state = Open;

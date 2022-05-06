@@ -31,7 +31,7 @@ mod tests {
 
     #[test]
     fn should_let_actions_through_when_open() {
-        let mut cb = create_circuit_breaker();
+        let cb = create_circuit_breaker();
 
         //Results must be used. It is almost always a logic error when you don't.
         let result = cb.guard::<String, ActionError>(Box::new(|| Ok("hello".to_string())));
@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn should_switch_to_open_after_failure_threshold() {
-        let mut cb = create_circuit_breaker();
+        let cb = create_circuit_breaker();
         for _ in 0..FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn should_switch_to_half_open_after_failure_threshold_exceeded_and_timeout_period_passed() {
-        let mut cb = create_circuit_breaker();
+        let cb = create_circuit_breaker();
         for _ in 0..FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
@@ -104,7 +104,7 @@ mod tests {
     #[test]
     fn should_switch_to_open_after_failure_threshold_exceeded_and_timeout_period_passed_and_half_open_attempts_exceeded(
     ) {
-        let mut cb = create_circuit_breaker();
+        let cb = create_circuit_breaker();
         for _ in 0..FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn should_switch_to_closed_after_failure_threshold_exceeded_and_timeout_period_passed_and_action_works_again(
     ) {
-        let mut cb = create_circuit_breaker();
+        let cb = create_circuit_breaker();
         for _ in 0..FAILURE_THRESHOLD {
             let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
             assert!(result.is_err());
