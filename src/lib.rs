@@ -18,7 +18,7 @@ mod tests {
 
   const FAILURE_THRESHOLD: i8 = 3;
   const HALF_OPEN_ATTEMPTS: i8 = 2;
-  const TIMEOUT: Duration = Duration::new(0, 5000000);
+  const TIMEOUT: Duration = Duration::new(1, 0);
 
   fn create_circuit_breaker() -> CircuitBreaker {
     return CircuitBreaker::new(FAILURE_THRESHOLD, HALF_OPEN_ATTEMPTS, TIMEOUT);
