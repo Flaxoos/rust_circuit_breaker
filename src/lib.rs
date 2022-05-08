@@ -6,15 +6,12 @@ mod circuit_breaker_error;
 #[cfg(test)]
 mod tests {
   use std::error::Error;
-  use std::ffi::NulError;
-  use std::fmt::{format, write, Debug, Display, Formatter, Pointer};
-  use std::io::ErrorKind;
-  use std::thread::Thread;
+  use std::fmt::{Debug, Display, Formatter};
+  use std::thread;
   use std::time::Duration;
-  use std::{io, thread};
 
   use crate::circuit_breaker::CircuitBreaker;
-  use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
+  use crate::circuit_breaker_error::CircuitBreakerError;
 
   const FAILURE_THRESHOLD: i8 = 3;
   const HALF_OPEN_ATTEMPTS: i8 = 2;
@@ -27,32 +24,42 @@ mod tests {
   #[test]
   fn should_let_actions_through_when_open() {
     let mut cb = create_circuit_breaker();
-    cb.guard::<String, ActionError>(Box::new(|| Ok("hello".to_string())));
+    let result = cb.guard::<String, ActionError>(Box::new(|| Ok("hello".to_string())));
+    let want = "hello".to_string();
+    let got = result.unwrap();
+    assert_eq!(got, want)
   }
 
   #[test]
   fn should_switch_to_open_after_failure_threshold() {
     let mut cb = create_circuit_breaker();
     for _ in 0..FAILURE_THRESHOLD {
-      let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
+      let error = ActionError {};
+      let result = cb.guard::<String, ActionError>(Box::new(move|| Err(error)));
       assert!(result.is_err());
-      let want = CircuitBreakerErrorType::ErrorWrapper;
-      let got = result.unwrap_err().error_type;
+      let want = CircuitBreakerError::Wrapped(error);
+      let got = result.unwrap_err();
       assert_eq!(got, want)
     }
 
     // should switch to open
-    let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
+    let error = ActionError {};
+    let result = cb.guard::<String, ActionError>(Box::new(move || Err(error)));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::Open;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::Open {
+      threshold: FAILURE_THRESHOLD,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want);
 
     // should stay open
-    let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
+    let error = ActionError {};
+    let result = cb.guard::<String, ActionError>(Box::new(move || Err(error)));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::Open;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::Open {
+      threshold: FAILURE_THRESHOLD,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want)
   }
 
@@ -60,18 +67,21 @@ mod tests {
   fn should_switch_to_half_open_after_failure_threshold_exceeded_and_timeout_period_passed() {
     let mut cb = create_circuit_breaker();
     for _ in 0..FAILURE_THRESHOLD {
-      let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
+      let error = ActionError {};
+      let result = cb.guard::<String, ActionError>(Box::new(move || Err(error)));
       assert!(result.is_err());
-      let want = CircuitBreakerErrorType::ErrorWrapper;
-      let got = result.unwrap_err().error_type;
+      let want = CircuitBreakerError::Wrapped(error);
+      let got = result.unwrap_err();
       assert_eq!(got, want)
     }
 
     // should switch to open
     let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::Open;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::Open {
+      threshold: FAILURE_THRESHOLD,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want);
 
     thread::sleep(TIMEOUT.mul_f32(1.1));
@@ -79,8 +89,10 @@ mod tests {
     // should switch to half open
     let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::HalfOpen;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::HalfOpen {
+      threshold: HALF_OPEN_ATTEMPTS,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want);
   }
 
@@ -89,18 +101,21 @@ mod tests {
   ) {
     let mut cb = create_circuit_breaker();
     for _ in 0..FAILURE_THRESHOLD {
-      let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
+      let error = ActionError {};
+      let result = cb.guard::<String, ActionError>(Box::new(move || Err(error)));
       assert!(result.is_err());
-      let want = CircuitBreakerErrorType::ErrorWrapper;
-      let got = result.unwrap_err().error_type;
+      let want = CircuitBreakerError::Wrapped(error);
+      let got = result.unwrap_err();
       assert_eq!(got, want)
     }
 
     // should switch to open
     let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::Open;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::Open {
+      threshold: FAILURE_THRESHOLD,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want);
 
     thread::sleep(TIMEOUT.mul_f32(1.1));
@@ -109,16 +124,20 @@ mod tests {
     for _ in 0..HALF_OPEN_ATTEMPTS {
       let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
       assert!(result.is_err());
-      let want = CircuitBreakerErrorType::HalfOpen;
-      let got = result.unwrap_err().error_type;
+      let want = CircuitBreakerError::HalfOpen {
+        threshold: HALF_OPEN_ATTEMPTS,
+      };
+      let got = result.unwrap_err();
       assert_eq!(got, want)
     }
 
     // should switch back to open
     let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::Open;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::Open {
+      threshold: FAILURE_THRESHOLD,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want);
   }
 
@@ -127,18 +146,21 @@ mod tests {
   ) {
     let mut cb = create_circuit_breaker();
     for _ in 0..FAILURE_THRESHOLD {
-      let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
+      let error = ActionError {};
+      let result = cb.guard::<String, ActionError>(Box::new(move || Err(error)));
       assert!(result.is_err());
-      let want = CircuitBreakerErrorType::ErrorWrapper;
-      let got = result.unwrap_err().error_type;
+      let want = CircuitBreakerError::Wrapped(error);
+      let got = result.unwrap_err();
       assert_eq!(got, want)
     }
 
     // should switch to open
     let result = cb.guard::<String, ActionError>(Box::new(|| Err(ActionError {})));
     assert!(result.is_err());
-    let want = CircuitBreakerErrorType::Open;
-    let got = result.unwrap_err().error_type;
+    let want = CircuitBreakerError::Open {
+      threshold: FAILURE_THRESHOLD,
+    };
+    let got = result.unwrap_err();
     assert_eq!(got, want);
 
     thread::sleep(TIMEOUT.mul_f32(1.1));
@@ -148,6 +170,7 @@ mod tests {
     assert!(!result.is_err());
   }
 
+  #[derive(Clone, Copy, PartialEq)]
   struct ActionError {}
 
   impl Debug for ActionError {

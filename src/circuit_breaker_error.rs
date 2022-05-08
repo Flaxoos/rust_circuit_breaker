@@ -2,56 +2,37 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 /// Error returned by [CircuitBreaker]
-pub struct CircuitBreakerError<E: Display> {
-  pub message: String,
-  pub error_type: CircuitBreakerErrorType,
-  pub cause: Option<E>,
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub enum CircuitBreakerError<E: Display> {
+  Wrapped(E),
+  Open { threshold: i8 },
+  HalfOpen { threshold: i8 },
 }
 
-impl<E: Display> CircuitBreakerError<E> {
-
-  /// Returns a [CircuitBreakerError] indicating the [CircuitBreaker] is [CircuitBreakerErrorType::Open]
-  pub fn open(failure_threshold: i8) -> Self {
-    CircuitBreakerError{
-      error_type: CircuitBreakerErrorType::Open,
-      message : format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", failure_threshold),
-      cause: None
-    }
-  }
-
-
-  /// Returns a [CircuitBreakerError] indicating the [CircuitBreaker] is [CircuitBreakerErrorType::Closed]
-  pub fn half_open(half_open_attempts: i8) -> Self {
-    CircuitBreakerError {
-      error_type: CircuitBreakerErrorType::HalfOpen,
-      message: format!("Action failed more than {} times, subsequent calls will be prevented until action is successful again", half_open_attempts),
-      cause: None
-    }
-  }
-
-  /// Returns a [CircuitBreakerError] wrapping an error
-  pub fn error_wrapper(error: E) -> Self {
-    CircuitBreakerError {
-      error_type: CircuitBreakerErrorType::ErrorWrapper,
-      message: format!("Action failed {}", error),
-      cause: Some(error),
-    }
-  }
-
-  fn format_message(&self) -> String {
-    format!("{}, {}", self.error_type, self.message)
-  }
-}
-
-#[cfg_attr(test, derive(PartialEq, Debug))]
-pub enum CircuitBreakerErrorType {
-  ErrorWrapper,
-  Open,
-  HalfOpen,
-}
-
-impl Display for CircuitBreakerErrorType {
+impl<E> Display for CircuitBreakerError<E>
+where
+  E: Display,
+{
   fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-    write!(f, "{}", self)
+    match self {
+        CircuitBreakerError::Wrapped(e) => write!(f, "Action failed {}", e),
+        CircuitBreakerError::Open { threshold: error_count } => write!(f, "Action failed more than {} times, subsequent calls will be prevented until action is successful again", error_count),
+        CircuitBreakerError::HalfOpen { threshold: error_count } => write!(f, "Action failed more than {} times, subsequent calls will be prevented until action is successful again", error_count),
+      }
+  }
+}
+
+impl<E> Error for CircuitBreakerError<E>
+where
+  E: Error,
+{
+  // if we are wrapped an error, we should override the default implementation of cause
+  // to provide that wrapped error
+  fn cause(&self) -> Option<&dyn Error> {
+    match self {
+      CircuitBreakerError::Wrapped(e) => Some(e),
+      _ => None,
+    }
   }
 }

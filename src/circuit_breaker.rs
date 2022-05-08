@@ -1,19 +1,17 @@
-use parking_lot::Mutex;
-use std::borrow::{Borrow, BorrowMut};
-use std::error::Error;
-use std::fmt::{format, Display};
-use std::ops::{Deref, DerefMut};
-use std::os::macos::raw::stat;
-use std::sync::atomic::{AtomicI8, AtomicUsize, Ordering};
-use std::sync::{Arc, LockResult};
-use std::time::Duration;
 use std::{mem, thread};
+use std::fmt::Display;
+use std::ops::Deref;
+use std::sync::{Arc};
+use std::sync::atomic::{AtomicI8, Ordering};
+use std::time::Duration;
 
-type Action<T, E: Display> = Box<dyn Fn() -> Result<T, E>>;
-type CircuitBreakerResult<T, E: Display> = Result<T, CircuitBreakerError<E>>;
+use parking_lot::Mutex;
 
 use crate::circuit_breaker::CircuitBreakerState::{Closed, HalfOpen, Open};
-use crate::circuit_breaker_error::{CircuitBreakerError, CircuitBreakerErrorType};
+use crate::circuit_breaker_error::CircuitBreakerError;
+
+type Action<T, E> = Box<dyn Fn() -> Result<T, E>>;
+type CircuitBreakerResult<T, E> = Result<T, CircuitBreakerError<E>>;
 
 /// A Circuit Breaker
 pub struct CircuitBreaker {
@@ -54,16 +52,20 @@ impl CircuitBreaker {
     mem::drop(state);
     match state_clone {
       Closed => self.attempt_action(self.failure_threshold, action),
-      Open => Err(CircuitBreakerError::open(self.failure_threshold)),
+      Open => Err(CircuitBreakerError::Open {
+        threshold: self.failure_threshold,
+      }),
       HalfOpen => match self.attempt_action(self.half_open_attempts, action) {
         Ok(action_result) => {
           let state = Arc::clone(&self.state);
-          mem::replace(&mut *state.lock(), Closed);
+          *state.lock() = Closed;
           Ok(action_result)
         }
         Err(e) => {
-          let error = if e.error_type == CircuitBreakerErrorType::ErrorWrapper {
-            CircuitBreakerError::half_open(self.half_open_attempts)
+          let error = if let CircuitBreakerError::Wrapped(_) = e {
+            CircuitBreakerError::HalfOpen {
+              threshold: self.half_open_attempts,
+            }
           } else {
             e
           };
@@ -83,25 +85,26 @@ impl CircuitBreaker {
         Ok(t) => Ok(t),
         Err(e) => {
           self.error_counter.fetch_add(1, Ordering::Relaxed);
-          Err(CircuitBreakerError::error_wrapper(e))
+          Err(CircuitBreakerError::Wrapped(e))
         }
       }
     } else {
       self.open_circuit();
-      Err(CircuitBreakerError::open(self.failure_threshold))
+      Err(CircuitBreakerError::Open {
+        threshold: self.failure_threshold,
+      })
     };
   }
 
   fn open_circuit(&mut self) {
-    let mut state = self.state.lock();
-    mem::replace(&mut *state, Open);
+    *self.state.lock() = Open;
     self.error_counter.store(0, Ordering::Relaxed);
 
     let state = Arc::clone(&self.state);
     let timeout = self.timeout;
     thread::spawn(move || {
       thread::sleep(timeout);
-      mem::replace(&mut *state.lock(), HalfOpen);
+      *state.lock() = HalfOpen;
     });
   }
 }
