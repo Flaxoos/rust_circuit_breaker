@@ -27,7 +27,7 @@ impl<E> Error for CircuitBreakerError<E>
 where
   E: Error,
 {
-  // if we are wrapped an error, we should override the default implementation of cause
+  // if we wrapped an error, we should override the default implementation of [cause]
   // to provide that wrapped error
   fn cause(&self) -> Option<&dyn Error> {
     match self {
